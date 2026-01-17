@@ -139,6 +139,7 @@ class AndroidCharacteristicCallbacks: public BLECharacteristicCallbacks {
 // ==========================================
 class AdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
+        // Filtrer par le service UUID
         if (advertisedDevice.haveServiceUUID() && 
             advertisedDevice.isAdvertisingService(BLEUUID(SENSOR_SERVICE_UUID))) {
             
