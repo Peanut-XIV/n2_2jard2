@@ -14,12 +14,6 @@
 #include <SPI.h>
 #include <config.h>
 
-union Bytes
-{
-    char table[4];
-    float value;
-};
-
 
 // TYPE DEFINITIONS ---------------------
 typedef enum {
@@ -251,6 +245,20 @@ void connectAndReadSlave(BLEAdvertisedDevice* device) {
         slavesData[boardId-1].received = true;
         
         DEBUG_PRINTLN("[BLE] Data retrieved");
+        
+        // Envoyer le sleep time au slave
+        BLERemoteService* pSleepTimeService = pClient->getService("9D818D7B-A445-46F5-8A3F-B9F86EA5DE2F");
+        if (pSleepTimeService != nullptr) {
+            BLERemoteCharacteristic* pSleepTimeChar = pSleepTimeService->getCharacteristic("CEF11275-083B-4027-AD0E-0DDB904278A5");
+            if (pSleepTimeChar && pSleepTimeChar->canWrite()) {
+                // Convertir la durée en hexadécimal (le slave lit en base 16)
+                char sleepTimeHex[20];
+                sprintf(sleepTimeHex, "%llx", (unsigned long long)SLEEP_DURATION);
+                pSleepTimeChar->writeValue(sleepTimeHex);
+                DEBUG_PRINT("[BLE]    Sleep time sent: ");
+                DEBUG_PRINTLN(sleepTimeHex);
+            }
+        }
         
         // Déconnexion
         pClient->disconnect();
@@ -809,10 +817,10 @@ void setup() {
     // Initialiser les structures de données
     for (int i = 0; i < MAX_SLAVES; i++) {
         slavesData[i].boardId = i + 1;
-        slavesData[i].temperature = 0.0;
-        slavesData[i].pressure = 0.0;
-        slavesData[i].humidity = 0.0;
-        slavesData[i].oxygen = -1.0;
+        slavesData[i].temperature = NAN;
+        slavesData[i].pressure = NAN;
+        slavesData[i].humidity = NAN;
+        slavesData[i].oxygen = NAN;
         strcpy(slavesData[i].isoTime, "0000-00-00T00:00:00");
         slavesData[i].received = false;
     }
@@ -929,7 +937,7 @@ void loop() {
                     TIMEOUT_COUNTER = 0;
                     
                     // Arrêter les services BLE
-                    BLEDevice::deinit(false);
+                    BLEDevice::deinit();
                     
                     // Configurer le deep sleep
                     esp_sleep_enable_timer_wakeup(SLEEP_DURATION);
