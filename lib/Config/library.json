@@ -1,0 +1,8 @@
+{
+  "name": "Config",
+  "version": "1.0.0",
+  "description": "Configuration partagée pour le projet Compost",
+  "keywords": "config, compost",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

@@ -1,0 +1,288 @@
+<!-- --- START: Simple 2-slide clickable slideshow --- -->
+<style>
+  .mini-carousel { 
+    position: relative; 
+    width: 100%; 
+    max-width: 1900px; 
+    margin: 20px auto; 
+    overflow: hidden; 
+    border-radius: 12px; 
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12); 
+    font-family: Arial, sans-serif; 
+  }
+
+  .slides { 
+    display: flex; 
+    transition: transform 0.6s ease; 
+  }
+
+  .slide { 
+    flex-shrink: 0; 
+    display: block; 
+    text-decoration: none; 
+    color: inherit; 
+    position: relative; 
+    min-height: 500px; /* Augmentation de la hauteur */
+    background-size: cover; 
+    background-position: center; 
+  }
+
+  .slide .overlay { 
+    position: absolute; 
+    inset: 0; 
+    background: linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.45)); 
+    display: flex; 
+    align-items: flex-end; 
+    padding: 24px; /* Plus d'espace pour le texte */
+    box-sizing: border-box; 
+    color: #fff; 
+  }
+
+  .slide h3 { 
+    margin: 0 0 10px 0; 
+    font-size: 28px; /* Texte plus grand */
+    line-height: 1.2; 
+  }
+
+  .slide p { 
+    margin: 0; 
+    font-size: 16px; /* Texte plus lisible */
+    opacity: .95; 
+  }
+
+  /* nav */
+  .carousel-nav { 
+    position: absolute; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    bottom: 15px; 
+    display: flex; 
+    gap: 10px; 
+    z-index: 5; 
+  }
+
+  .dot { 
+    width: 14px; 
+    height: 14px; 
+    border-radius: 50%; 
+    background: rgba(255,255,255,0.5); 
+    cursor: pointer; 
+    border: 2px solid rgba(0,0,0,0.08); 
+  }
+
+  .dot.active { 
+    background: #ffffff; 
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.12); 
+  }
+
+  /* arrows */
+  .arrow { 
+    position: absolute; 
+    top: 50%; 
+    transform: translateY(-50%); 
+    background: rgba(0,0,0,0.35); 
+    color: #fff; 
+    width: 44px; /* légèrement plus grand */
+    height: 44px; 
+    border-radius: 50%; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    cursor: pointer; 
+    z-index: 6; 
+  }
+
+  .arrow.left { left: 12px; } 
+  .arrow.right { right: 12px; }
+
+  @media (max-width:900px){ 
+    .slide{ min-height: 380px } 
+    .slide h3{ font-size: 22px } 
+    .slide p{ font-size: 15px } 
+  }
+
+  @media (max-width:600px){ 
+    .slide{ min-height: 280px } 
+    .slide h3{ font-size: 18px } 
+    .slide p{ font-size: 14px } 
+  }
+</style>
+
+
+<div class="mini-carousel" id="miniCarousel">
+  <div class="slides" id="slidesContainer">
+    <!-- Slide 1: remplace href et background-image -->
+    <a class="slide" href="sympathyempathy" style="background-image:url('https://www.21kschool.com/et/wp-content/uploads/sites/38/2025/05/Sympathy-Vs-Empathy-Identifying-the-Key-Difference.png');">
+      <div class="overlay">
+        <div>
+          <h3>Sympathy & Empathy</h3>
+          <p>Click to explore the difference between sympathy and empathy.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 2: remplace href et background-image -->
+    <a class="slide" href="darkfactor" style="background-image:url('https://www.darkfactor.org/img/about.png');">
+      <div class="overlay">
+        <div>
+          <h3>The Dark Factor</h3>
+          <p>Discover your darker side and understand your personality.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 3 -->
+    <a class="slide" href="emptyyourmind" style="background-image:url('https://heloise-delabarre-sophrologue.com/wp-content/uploads/2024/05/pensees-intrusives.jpeg');">
+      <div class="overlay">
+        <div>
+          <h3>Empty Your Mind</h3>
+          <p>Take a moment to clear your thoughts and find inner peace.</p>
+        </div>
+      </div>
+    </a>
+
+  <a class="slide" href="negation" style="background-image:url('https://images.unsplash.com/photo-1516534775068-ba3e7458af70?w=1200');">
+      <div class="overlay">
+        <div>
+          <h3>Avoid negative words</h3>
+          <p>There is a difference between what you understand and what your body understands.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 5 -->
+    <a class="slide" href="calmness" style="background-image:url('https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=1200');">
+      <div class="overlay">
+        <div>
+          <h3>Calmness</h3>
+          <p>Find your inner peace and embrace tranquility in every moment.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 6 -->
+    <a class="slide" href="conflict" style="background-image:url('https://media.licdn.com/dms/image/v2/D4E12AQEUKTIFp8FzWQ/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1657010123073?e=2147483647&v=beta&t=WjRYtsE_SN1mEA4DeYs4VTUjF7MDx0OIKdWSfC0UK40');">
+      <div class="overlay">
+        <div>
+          <h3>Conflict</h3>
+          <p>Manage and resolve conflicts effectively.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 7 -->
+    <a class="slide" href="emotion" style="background-image:url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200');">
+      <div class="overlay">
+        <div>
+          <h3>Emotion</h3>
+          <p>Understand and embrace your emotions for better self-awareness.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 8 -->
+    <a class="slide" href="meditation" style="background-image:url('https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200');">
+      <div class="overlay">
+        <div>
+          <h3>Meditation</h3>
+          <p>Practice mindfulness and connect with your inner self.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 9 -->
+    <a class="slide" href="badmouthing" style="background-image:url('https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200');">
+      <div class="overlay">
+        <div>
+          <h3>Badmouthing</h3>
+          <p>Learn how negative speech affects you and those around you.</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Slide 10 -->
+    <a class="slide" href="powerlessness" style="background-image:url('https://images.unsplash.com/photo-1494548162494-384bba4ab999?w=1200');">
+      <div class="overlay">
+        <div>
+          <h3>Powerlessness</h3>
+          <p>You are the problem.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+
+
+
+
+  <!-- Optional arrows -->
+  <div class="arrow left" id="prevBtn" aria-hidden="true">&#9664;</div>
+  <div class="arrow right" id="nextBtn" aria-hidden="true">&#9654;</div>
+
+  <!-- Dots -->
+  <div class="carousel-nav" id="carouselDots">
+    <div class="dot active" data-index="0"></div>
+    <div class="dot" data-index="1"></div>
+    <div class="dot" data-index="2"></div>
+    <div class="dot" data-index="3"></div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    // ====== VARIABLE GLOBALE À MODIFIER ======
+    const nb_articles = 10;
+    // =========================================
+    
+    const slides = document.getElementById('slidesContainer');
+    const dotsContainer = document.getElementById('carouselDots');
+    const prev = document.getElementById('prevBtn');
+    const next = document.getElementById('nextBtn');
+    let index = 0;
+    
+    // Calculer les valeurs dynamiquement
+    const slideWidth = 100 / nb_articles;
+    const containerWidth = 100 * nb_articles;
+    
+    // Appliquer les styles dynamiquement
+    slides.style.width = containerWidth + '%';
+    document.querySelectorAll('.slide').forEach(slide => {
+      slide.style.width = slideWidth + '%';
+    });
+    
+    // Générer les dots dynamiquement
+    dotsContainer.innerHTML = '';
+    for(let i = 0; i < nb_articles; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i === 0 ? ' active' : '');
+      dot.dataset.index = i;
+      dotsContainer.appendChild(dot);
+    }
+    
+    const dots = Array.from(document.querySelectorAll('#carouselDots .dot'));
+
+    function goTo(i) {
+      index = ((i % nb_articles) + nb_articles) % nb_articles;
+      slides.style.transform = 'translateX(' + (-index * slideWidth) + '%)';
+      dots.forEach(d => d.classList.remove('active'));
+      dots[index].classList.add('active');
+    }
+
+    // Démarrer sur la deuxième slide (index 1)
+    goTo(1);
+
+    dots.forEach(d => d.addEventListener('click', e => goTo(+d.dataset.index)));
+    prev.addEventListener('click', ()=> goTo(index - 1));
+    next.addEventListener('click', ()=> goTo(index + 1));
+
+    // Optional: swipe support for mobile
+    let startX = null;
+    slides.addEventListener('touchstart', e => startX = e.touches[0].clientX );
+    slides.addEventListener('touchend', e => {
+      if(startX === null) return;
+      const dx = (e.changedTouches[0].clientX - startX);
+      if(Math.abs(dx) > 40) goTo(index + (dx > 0 ? -1 : 1));
+      startX = null;
+    });
+  })();
+</script>
+<!-- --- END --- -->
