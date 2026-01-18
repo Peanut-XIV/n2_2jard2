@@ -70,6 +70,7 @@ bool androidConnected = false;
 bool dataRequested = false;
 bool clearRequested = false;
 bool allSlavesScanned = false;
+std::vector<BLEAddress> foundSlaves;  // Adresses des slaves trouvés
 
 DateTime currentDateTime;
 
@@ -139,17 +140,23 @@ class AndroidCharacteristicCallbacks: public BLECharacteristicCallbacks {
 // ==========================================
 class AdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
+        DEBUG_PRINT("[BLE] Device detected: ");
+        DEBUG_PRINTLN(advertisedDevice.getName().c_str());
+        DEBUG_PRINT("[BLE]    Address: ");
+        DEBUG_PRINTLN(advertisedDevice.getAddress().toString().c_str());
+        DEBUG_PRINT("[BLE]    Has Service UUID: ");
+        DEBUG_PRINTLN(advertisedDevice.haveServiceUUID() ? "YES" : "NO");
+        
         // Filtrer par le service UUID
         if (advertisedDevice.haveServiceUUID() && 
             advertisedDevice.isAdvertisingService(BLEUUID(SENSOR_SERVICE_UUID))) {
             
-            DEBUG_PRINT("[BLE] Slave found: ");
-            DEBUG_PRINTLN(advertisedDevice.getName().c_str());
+            DEBUG_PRINTLN("[BLE]    *** MATCH! Storing slave address ***");
             
-            // Se connecter et récupérer les données
-            BLEAdvertisedDevice* devicePtr = new BLEAdvertisedDevice(advertisedDevice);
-            connectAndReadSlave(devicePtr);
-            delete devicePtr;
+            // Stocker l'adresse pour connexion ultérieure
+            foundSlaves.push_back(advertisedDevice.getAddress());
+        } else {
+            DEBUG_PRINTLN("[BLE]    Service UUID does not match");
         }
     }
 };
@@ -157,12 +164,15 @@ class AdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 // ==========================================
 // CONNEXION À UN ESCLAVE ET LECTURE DES DONNÉES
 // ==========================================
-void connectAndReadSlave(BLEAdvertisedDevice* device) {
+void connectAndReadSlave(BLEAddress address, std::string deviceName) {
     BLEClient* pClient = BLEDevice::createClient();
     
-    DEBUG_PRINTLN("[BLE] Connecting to slave...");
+    DEBUG_PRINT("[BLE] Connecting to slave: ");
+    DEBUG_PRINTLN(deviceName.c_str());
+    DEBUG_PRINT("[BLE]    Address: ");
+    DEBUG_PRINTLN(address.toString().c_str());
     
-    if (pClient->connect(device)) {
+    if (pClient->connect(address)) {
         DEBUG_PRINTLN("[BLE] Connected");
         
         // Récupérer le service
@@ -175,7 +185,6 @@ void connectAndReadSlave(BLEAdvertisedDevice* device) {
         }
         
         // Extraire l'ID depuis le nom du dispositif (format: "EnvSensor_X")
-        std::string deviceName = device->getName();
         uint8_t boardId = 0;
         
         // Chercher le dernier caractère qui devrait être l'ID
@@ -723,17 +732,49 @@ void saveDateTime() {
 // ==========================================
 void scanSlaves() {
     DEBUG_PRINTLN("[BLE] Scanning for slaves...");
+    DEBUG_PRINT("[BLE] Scan duration: ");
+    DEBUG_PRINT(BLE_SCAN_TIME);
+    DEBUG_PRINTLN(" seconds");
     
-    // Réinitialiser les flags de réception
+    // Réinitialiser les flags de réception et la liste des slaves trouvés
     for (int i = 0; i < MAX_SLAVES; i++) {
         slavesData[i].received = false;
     }
+    foundSlaves.clear();
     
     // Scanner pendant BLE_SCAN_TIME secondes
+    DEBUG_PRINTLN("[BLE] Starting scan NOW...");
     BLEScanResults foundDevices = pBLEScan->start(BLE_SCAN_TIME, false);
-    DEBUG_PRINT("[BLE]    Found ");
-    DEBUG_PRINT(foundDevices.getCount());
-    DEBUG_PRINTLN(" devices");
+    DEBUG_PRINTLN("[BLE] Scan completed!");
+    
+    DEBUG_PRINT("[BLE]    Total devices found: ");
+    DEBUG_PRINTLN(foundDevices.getCount());
+    DEBUG_PRINT("[BLE]    Matching slaves: ");
+    DEBUG_PRINTLN(foundSlaves.size());
+    
+    // Se connecter à chaque slave trouvé
+    for (int i = 0; i < foundSlaves.size(); i++) {
+        DEBUG_PRINT("[BLE] Processing slave ");
+        DEBUG_PRINT(i + 1);
+        DEBUG_PRINT("/");
+        DEBUG_PRINTLN(foundSlaves.size());
+        
+        // Extraire le nom depuis l'adresse (on utilise les résultats du scan)
+        std::string slaveName = "";
+        for (int j = 0; j < foundDevices.getCount(); j++) {
+            BLEAdvertisedDevice device = foundDevices.getDevice(j);
+            if (device.getAddress().equals(foundSlaves[i])) {
+                slaveName = device.getName();
+                break;
+            }
+        }
+        
+        // Se connecter et lire les données
+        connectAndReadSlave(foundSlaves[i], slaveName);
+        
+        // Petit délai entre les connexions
+        delay(500);
+    }
     
     pBLEScan->clearResults();
     allSlavesScanned = true;
