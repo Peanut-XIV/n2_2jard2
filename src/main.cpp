@@ -14,9 +14,10 @@
 #include <SPI.h>
 #include <config.h>
 
-
 // TYPE DEFINITIONS ---------------------
 typedef enum {
+  TIME,
+  SCAN_START,
   SCAN_SLAVES,
   PROCESS_DATA,
   WAIT_ANDROID,
@@ -70,7 +71,10 @@ bool androidConnected = false;
 bool dataRequested = false;
 bool clearRequested = false;
 bool allSlavesScanned = false;
-std::vector<BLEAddress> foundSlaves;  // Adresses des slaves trouvés
+BLEAddress foundSlaves[MAX_SLAVES];  // Adresses des slaves trouvés
+String slaveNames[MAX_SLAVES];        // Noms des slaves trouvés
+int foundSlaveCount = 0;
+bool scanInProgress = false;
 
 DateTime currentDateTime;
 
@@ -82,8 +86,9 @@ RTC_DATA_ATTR int64_t SLEEP_DURATION = SLEEP_TIME_US;
 // DÉCLARATIONS DE FONCTIONS
 // ==========================================
 void init_BLE();
-void scanSlaves();
-void connectAndReadSlave(BLEAdvertisedDevice* device);
+void startScan();
+bool processSlave();
+void connectAndReadSlave(BLEAddress address, std::string deviceName);
 bool initSD();
 void saveDataToSD();
 void sendDataToAndroid();
@@ -153,8 +158,12 @@ class AdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
             
             DEBUG_PRINTLN("[BLE]    *** MATCH! Storing slave address ***");
             
-            // Stocker l'adresse pour connexion ultérieure
-            foundSlaves.push_back(advertisedDevice.getAddress());
+            // Stocker l'adresse et le nom pour connexion ultérieure
+            if (foundSlaveCount < MAX_SLAVES) {
+                foundSlaves[foundSlaveCount] = advertisedDevice.getAddress();
+                slaveNames[foundSlaveCount] = advertisedDevice.getName().c_str();
+                foundSlaveCount++;
+            }
         } else {
             DEBUG_PRINTLN("[BLE]    Service UUID does not match");
         }
@@ -728,56 +737,78 @@ void saveDateTime() {
 }
 
 // ==========================================
-// SCAN DES ESCLAVES
+// DÉMARRER LE SCAN BLE
 // ==========================================
-void scanSlaves() {
-    DEBUG_PRINTLN("[BLE] Scanning for slaves...");
+void startScan() {
+    DEBUG_PRINTLN("[BLE] Starting BLE scan...");
     DEBUG_PRINT("[BLE] Scan duration: ");
     DEBUG_PRINT(BLE_SCAN_TIME);
     DEBUG_PRINTLN(" seconds");
     
-    // Réinitialiser les flags de réception et la liste des slaves trouvés
+    // Réinitialiser
     for (int i = 0; i < MAX_SLAVES; i++) {
         slavesData[i].received = false;
     }
-    foundSlaves.clear();
+    foundSlaveCount = 0;
+    scanInProgress = true;
+    allSlavesScanned = false;
     
-    // Scanner pendant BLE_SCAN_TIME secondes
-    DEBUG_PRINTLN("[BLE] Starting scan NOW...");
-    BLEScanResults foundDevices = pBLEScan->start(BLE_SCAN_TIME, false);
-    DEBUG_PRINTLN("[BLE] Scan completed!");
+    // Lancer le scan en mode non-bloquant
+    pBLEScan->start(BLE_SCAN_TIME, false);
+}
+
+// ==========================================
+// TRAITER UN ESCLAVE À LA FOIS
+// ==========================================
+bool processSlave() {
+    static int FIFO_Lecture = 0;
     
-    DEBUG_PRINT("[BLE]    Total devices found: ");
-    DEBUG_PRINTLN(foundDevices.getCount());
-    DEBUG_PRINT("[BLE]    Matching slaves: ");
-    DEBUG_PRINTLN(foundSlaves.size());
-    
-    // Se connecter à chaque slave trouvé
-    for (int i = 0; i < foundSlaves.size(); i++) {
-        DEBUG_PRINT("[BLE] Processing slave ");
-        DEBUG_PRINT(i + 1);
-        DEBUG_PRINT("/");
-        DEBUG_PRINTLN(foundSlaves.size());
-        
-        // Extraire le nom depuis l'adresse (on utilise les résultats du scan)
-        std::string slaveName = "";
-        for (int j = 0; j < foundDevices.getCount(); j++) {
-            BLEAdvertisedDevice device = foundDevices.getDevice(j);
-            if (device.getAddress().equals(foundSlaves[i])) {
-                slaveName = device.getName();
-                break;
-            }
-        }
-        
-        // Se connecter et lire les données
-        connectAndReadSlave(foundSlaves[i], slaveName);
-        
-        // Petit délai entre les connexions
-        delay(500);
+    // Si le scan est encore en cours, attendre
+    if (scanInProgress && pBLEScan->isScanning()) {
+        return false;
     }
     
-    pBLEScan->clearResults();
-    allSlavesScanned = true;
+    // Le scan vient de se terminer
+    if (scanInProgress && !pBLEScan->isScanning()) {
+        scanInProgress = false;
+        DEBUG_PRINTLN("[BLE] Scan completed!");
+        DEBUG_PRINT("[BLE]    Matching slaves found: ");
+        DEBUG_PRINTLN(foundSlaveCount);
+        FIFO_Lecture = 0;
+    }
+    
+    // Aucun slave à traiter
+    if (foundSlaveCount == 0) {
+        pBLEScan->clearResults();
+        allSlavesScanned = true;
+        return true;
+    }
+    
+    // Traiter le prochain slave
+    if (FIFO_Lecture < foundSlaveCount) {
+        DEBUG_PRINT("[BLE] Processing slave ");
+        DEBUG_PRINT(FIFO_Lecture + 1);
+        DEBUG_PRINT("/");
+        DEBUG_PRINTLN(foundSlaveCount);
+        
+        BLEAddress adresse = foundSlaves[FIFO_Lecture];
+        String nom = slaveNames[FIFO_Lecture];
+        
+        // Se connecter et lire les données
+        connectAndReadSlave(adresse, nom.c_str());
+        
+        FIFO_Lecture++;
+        
+        // Tous les slaves traités?
+        if (FIFO_Lecture >= foundSlaveCount) {
+            FIFO_Lecture = 0;
+            pBLEScan->clearResults();
+            allSlavesScanned = true;
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // ==========================================
@@ -874,66 +905,64 @@ void setup() {
 // LOOP
 // ==========================================
 void loop() {
-    delay(10);
-    MasterState currentState = SCAN_SLAVES;
+    MasterState currentState = TIME;
     int32_t timer_start_time = millis();
     
     while (1) {
         switch(currentState) {
-            case SCAN_SLAVES:
-                DEBUG_PRINTLN("[SCAN_SLAVES]");
-                
+            case TIME:
                 // Incrémenter la date (ajouter le temps de sleep)
                 incrementDateTime(SLEEP_TIME_MINUTES * 60);
+                DEBUG_PRINTLN("[TIME] Date/Time incremented");
                 saveDateTime();
+                currentState = SCAN_START;
+                break;
                 
-                // Scanner les esclaves
-                scanSlaves();
-                allSlavesScanned = true;
-                currentState = PROCESS_DATA;
-                timer_start_time = millis();
-                TIMEOUT_COUNTER = 0;
+            case SCAN_START:
+                DEBUG_PRINTLN("[SCAN_START]");
+                startScan();
+                currentState = SCAN_SLAVES;
+                break;
+                
+            case SCAN_SLAVES:
+                // Traiter un slave à la fois (non-bloquant)
+                if (processSlave()) {
+                    DEBUG_PRINTLN("[SCAN_SLAVES] All slaves processed");
+                    currentState = PROCESS_DATA;
+                }
+                // yield() au lieu de delay pour économiser l'énergie
+                yield();
                 break;
             
             case PROCESS_DATA:
                 DEBUG_PRINTLN("[PROCESS_DATA]");
                 
-                // Vérifier le timeout
-                if (millis() - timer_start_time > SLEEP_DURATION / 1000) {
-                    TIMEOUT_COUNTER++;
-                    DEBUG_PRINT("[PROCESS_DATA] TIMEOUT_COUNTER = ");
-                    DEBUG_PRINTLN(TIMEOUT_COUNTER);
-                    timer_start_time = millis();
-                }
+                // Sauvegarder les données sur SD
+                saveDataToSD();
                 
-                // Sauvegarder les données sur SD si disponibles
-                if (allSlavesScanned) {
-                    saveDataToSD();
-                    allSlavesScanned = false;
-                    
-                    // Afficher un résumé
-                    DEBUG_PRINTLN("[PROCESS_DATA] Summary:");
-                    for (int i = 0; i < MAX_SLAVES; i++) {
-                        if (slavesData[i].received) {
-                            DEBUG_PRINT("[PROCESS_DATA]    Board ");
-                            DEBUG_PRINT(slavesData[i].boardId);
-                            DEBUG_PRINT(": T=");
-                            DEBUG_PRINT(slavesData[i].temperature);
-                            DEBUG_PRINT("C  H=");
-                            DEBUG_PRINT(slavesData[i].humidity);
-                            DEBUG_PRINT("%  O2=");
-                            DEBUG_PRINT(slavesData[i].oxygen);
-                            DEBUG_PRINTLN("%");
-                        } else {
-                            DEBUG_PRINT("[PROCESS_DATA]    Board ");
-                            DEBUG_PRINT(i+1);
-                            DEBUG_PRINTLN(": No data received");
-                        }
+                // Afficher un résumé
+                DEBUG_PRINTLN("[PROCESS_DATA] Summary:");
+                for (int i = 0; i < MAX_SLAVES; i++) {
+                    if (slavesData[i].received) {
+                        DEBUG_PRINT("[PROCESS_DATA]    Board ");
+                        DEBUG_PRINT(slavesData[i].boardId);
+                        DEBUG_PRINT(": T=");
+                        DEBUG_PRINT(slavesData[i].temperature);
+                        DEBUG_PRINT("C  H=");
+                        DEBUG_PRINT(slavesData[i].humidity);
+                        DEBUG_PRINT("%  O2=");
+                        DEBUG_PRINT(slavesData[i].oxygen);
+                        DEBUG_PRINTLN("%");
+                    } else {
+                        DEBUG_PRINT("[PROCESS_DATA]    Board ");
+                        DEBUG_PRINT(i+1);
+                        DEBUG_PRINTLN(": No data received");
                     }
                 }
                 
-                currentState = WAIT_ANDROID;
-                timer_start_time = millis();
+                // Aller directement en deep sleep
+                DEBUG_PRINTLN("[PROCESS_DATA] Data saved, going to sleep");
+                currentState = PREPARE_SLEEP;
                 break;
             
             case WAIT_ANDROID:
@@ -967,27 +996,17 @@ void loop() {
                 break;
             
             case PREPARE_SLEEP:
-                if (millis() - timer_start_time > SLEEP_DURATION / 1000) {
-                    TIMEOUT_COUNTER++;
-                    DEBUG_PRINT("[PREPARE_SLEEP] TIMEOUT_COUNTER = ");
-                    DEBUG_PRINTLN(TIMEOUT_COUNTER);
-                    timer_start_time = millis();
-                }
+                DEBUG_PRINTLN("[PREPARE_SLEEP] Entering deep sleep...");
+                DEBUG_PRINT("[PREPARE_SLEEP] Sleep duration: ");
+                DEBUG_PRINT(SLEEP_DURATION / 1000000);
+                DEBUG_PRINTLN(" seconds");
                 
-                if (TIMEOUT_COUNTER >= MAX_TIMEOUT_COUNT || !androidConnected) {
-                    DEBUG_PRINTLN("[PREPARE_SLEEP] Entering deep sleep...");
-                    TIMEOUT_COUNTER = 0;
-                    
-                    // Arrêter les services BLE
-                    BLEDevice::deinit();
-                    
-                    // Configurer le deep sleep
-                    esp_sleep_enable_timer_wakeup(SLEEP_DURATION);
-                    esp_deep_sleep_start();
-                } else {
-                    // Attendre encore un peu pour Android
-                    currentState = WAIT_ANDROID;
-                }
+                // Arrêter les services BLE
+                BLEDevice::deinit();
+                
+                // Configurer le deep sleep
+                esp_sleep_enable_timer_wakeup(SLEEP_DURATION);
+                esp_deep_sleep_start();
                 break;
             
             case BROKEN_LINK:
