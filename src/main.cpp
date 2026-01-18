@@ -762,28 +762,6 @@ void startScan() {
 // ==========================================
 bool processSlave() {
     static int FIFO_Lecture = 0;
-    
-    // Si le scan est encore en cours, attendre
-    if (scanInProgress && pBLEScan->isScanning()) {
-        return false;
-    }
-    
-    // Le scan vient de se terminer
-    if (scanInProgress && !pBLEScan->isScanning()) {
-        scanInProgress = false;
-        DEBUG_PRINTLN("[BLE] Scan completed!");
-        DEBUG_PRINT("[BLE]    Matching slaves found: ");
-        DEBUG_PRINTLN(foundSlaveCount);
-        FIFO_Lecture = 0;
-    }
-    
-    // Aucun slave à traiter
-    if (foundSlaveCount == 0) {
-        pBLEScan->clearResults();
-        allSlavesScanned = true;
-        return true;
-    }
-    
     // Traiter le prochain slave
     if (FIFO_Lecture < foundSlaveCount) {
         DEBUG_PRINT("[BLE] Processing slave ");
